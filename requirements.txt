@@ -1,0 +1,5 @@
+simpy
+pandas
+boto3
+requests
+python-dotenv
