@@ -1,43 +1,51 @@
 import simpy
 import random
-import pandas as pd
-from datetime import datetime, timedelta
+import os
+from datetime import datetime
 import boto3
 import json
+import time
 from config import AWS_REGION, KINESIS_STREAM_NAME, SIMULATION_ID
 
 
-def send_to_aws(data, data_type="package"):
-    try:
-        kinesis_client = boto3.client('kinesis', region_name=AWS_REGION)
-        
-        # Add simulation metadata
-        data['simulation_id'] = SIMULATION_ID
-        data['data_type'] = data_type
-        
-        # Convert to JSON and encode
-        payload = json.dumps(data).encode('utf-8')
-        
-        response = kinesis_client.put_record(
-            StreamName=KINESIS_STREAM_NAME,
-            Data=payload,
-            PartitionKey=str(data.get('PackageID', data.get('RobotName', 'default')))
-        )
-        
-        print(f"✅ Sent {data_type} data to Kinesis: {data}")
-        return response
-    except Exception as e:
-        print(f"❌ Exception while sending {data_type} data to Kinesis:", e)
+def send_to_aws(data, data_type="package", max_retries=3):
+    for attempt in range(max_retries):
+        try:
+            kinesis_client = boto3.client('kinesis', region_name=AWS_REGION)
+            
+            # Add simulation metadata
+            data['simulation_id'] = SIMULATION_ID
+            data['data_type'] = data_type
+            
+            # Convert to JSON and encode
+            payload = json.dumps(data).encode('utf-8')
+            
+            response = kinesis_client.put_record(
+                StreamName=KINESIS_STREAM_NAME,
+                Data=payload,
+                PartitionKey=str(data.get('PackageID', data.get('RobotName', 'default')))
+            )
+            
+            print(f"✅ Sent {data_type} data to Kinesis")
+            return response
+        except Exception as e:
+            if attempt == max_retries - 1:
+                print(f"❌ Exception while sending {data_type} data to Kinesis:", e)
+            else:
+                print(f"⚠️ Retry {attempt + 1}/{max_retries} for {data_type}")
+                time.sleep(1)  # Add a small delay between retries
 
 
 class Robot:
     def __init__(self, env, name, energy_use, failure_rate):
         self.env = env
         self.name = name
-        self.energy_use = energy_use  # Energy consumption per task
-        self.failure_rate = failure_rate  # Probability of failure during a task
+        self.energy_use = energy_use
+        self.failure_rate = failure_rate
         self.tasks_completed = 0
         self.total_energy_used = 0
+        # Use the environment's sim_id instead of generating a new one
+        self.sim_id = env.sim_id
         
     def send_telemetry(self, task_type, duration):
         telemetry_data = {
@@ -51,6 +59,7 @@ class Robot:
             "Timestamp": datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
         }
         send_to_aws(telemetry_data, data_type="robot_telemetry")
+        print(f"[Sim #{self.sim_id}] ✅ Sent telemetry for {self.name}")
 
     def check_failure(self):
         # Simulate a failure based on the failure rate
@@ -172,12 +181,11 @@ class MoverRobot(Robot):
 
 
 class Package:
-    def __init__(self, env, package_id, stations, data_log, mover_robots):
+    def __init__(self, env, package_id, stations, mover_robots):
         self.env = env
         self.package_id = package_id
         self.stations = stations
-        self.data_log = data_log
-        self.mover_robots = mover_robots  # Pool of mover robots
+        self.mover_robots = mover_robots
 
         # Metadata
         self.weight_kg = round(random.uniform(0.5, 10.0), 2)
@@ -202,17 +210,6 @@ class Package:
 
         # Process at the final station
         yield self.env.process(self.stations[-1].process(self))
-
-        # Log final status
-        self.data_log.append([
-            self.package_id,
-            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'Completed',
-            self.weight_kg,
-            self.volume_liters,
-            self.priority,
-            self.destination_zone
-        ])
 
 
 class Station:
@@ -253,8 +250,13 @@ class Station:
 
 def simulate():
     env = simpy.Environment()
-    data_log = []
-
+    # Use pod name as simulation identifier instead of random number
+    pod_name = os.getenv('HOSTNAME', f'local-{random.randint(1000,9999)}')
+    sim_id = f"{SIMULATION_ID}-{pod_name}"
+    env.sim_id = sim_id  # Store sim_id in environment for robots to access
+    
+    print(f"\n=== Starting Simulation {sim_id} ===\n")
+    
     # Define stations with their specialized robots and tasks
     stow = Station(env, 'Stow', StowRobot, robot_task='stow', num_robots=5, stow_capacity=10)
     pick = Station(env, 'Pick', PickRobot, robot_task='pick', num_robots=5, pick_accuracy=95)
@@ -265,18 +267,19 @@ def simulate():
     # Create a pool of mover robots for inter-station movement
     mover_robots = [MoverRobot(env, f"MoverRobot{i}", speed=5) for i in range(3)]
 
+    print(f"Simulation {sim_id}: Created {len(mover_robots)} mover robots")
+    print(f"Simulation {sim_id}: Initializing stations: {', '.join([s.name for s in stations])}")
+
     # Create packages
     for i in range(1, 11):  # simulate 10 packages
-        Package(env, f'P{i}', stations, data_log, mover_robots)
+        Package(env, f'P{i}', stations, mover_robots)
+        print(f"Simulation {sim_id}: Created package P{i}")
 
     env.run(until=100)
+    print(f"\n=== Simulation {sim_id} complete ===\n")
 
-    df = pd.DataFrame(data_log, columns=[
-        'PackageID', 'Timestamp', 'Status', 'Weight_kg', 'Volume_L', 'Priority', 'DestinationZone'
-    ])
-    df.to_csv('fulfillment_data.csv', index=False)
-    print("Simulation complete. Data saved to fulfillment_data.csv.")
 
 if __name__ == "__main__":
-    simulate()
     print("Simulation started.")
+    simulate()
+

@@ -1,0 +1,18 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Federated": "arn:aws:iam::805791260265:oidc-provider/oidc.eks.us-west-2.amazonaws.com/id/7016BF8986F3CA3FF0579903F0EA9311"
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+                "StringLike": {
+                    "oidc.eks.us-west-2.amazonaws.com/id/7016BF8986F3CA3FF0579903F0EA9311:sub": "system:serviceaccount:robotics-sim:*",
+                    "oidc.eks.us-west-2.amazonaws.com/id/7016BF8986F3CA3FF0579903F0EA9311:aud": "sts.amazonaws.com"
+                }
+            }
+        }
+    ]
+}

@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: robotics-sim-job
+  namespace: robotics-sim
+spec:
+  completions: 3  # Run 3 simulations
+  parallelism: 3  # Run them in parallel
+  template:
+    metadata:
+      labels:
+        app: robotics-sim
+    spec:
+      restartPolicy: Never  # Don't restart on completion
+      serviceAccountName: robotics-sim-sa
+      containers:
+        - name: robotics-sim
+          image: 805791260265.dkr.ecr.us-west-2.amazonaws.com/robotics-sim:latest
+          imagePullPolicy: Always
+          env:
+            - name: AWS_REGION
+              value: "us-west-2"
+            - name: KINESIS_STREAM_NAME
+              value: "robotics-sim-stream"
+            - name: SIMULATION_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
