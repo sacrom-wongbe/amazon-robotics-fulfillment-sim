@@ -193,7 +193,7 @@ class Package:
         self.priority = random.choice(['Low', 'Standard', 'High'])
         self.destination_zone = random.choice(['A', 'B', 'C'])
 
-        self.env.process(self.run())
+        self.process = env.process(self.run())  # Store the process for tracking
 
     def run(self):
         for i in range(len(self.stations) - 1):
@@ -210,6 +210,7 @@ class Package:
 
         # Process at the final station
         yield self.env.process(self.stations[-1].process(self))
+        print(f"Package {self.package_id} completed full processing")
 
 
 class Station:
@@ -248,14 +249,14 @@ class Station:
             return delay
 
 
-def simulate():
+def simulate(num_packages=10):
     env = simpy.Environment()
     # Use pod name as simulation identifier instead of random number
     pod_name = os.getenv('HOSTNAME', f'local-{random.randint(1000,9999)}')
     sim_id = f"{SIMULATION_ID}-{pod_name}"
     env.sim_id = sim_id  # Store sim_id in environment for robots to access
     
-    print(f"\n=== Starting Simulation {sim_id} ===\n")
+    print(f"\n=== Starting Simulation {sim_id} with {num_packages} packages ===\n")
     
     # Define stations with their specialized robots and tasks
     stow = Station(env, 'Stow', StowRobot, robot_task='stow', num_robots=5, stow_capacity=10)
@@ -270,16 +271,21 @@ def simulate():
     print(f"Simulation {sim_id}: Created {len(mover_robots)} mover robots")
     print(f"Simulation {sim_id}: Initializing stations: {', '.join([s.name for s in stations])}")
 
-    # Create packages
-    for i in range(1, 11):  # simulate 10 packages
-        Package(env, f'P{i}', stations, mover_robots)
+    # Create packages and track their completion
+    active_packages = []
+    for i in range(1, num_packages + 1):
+        package = Package(env, f'P{i}', stations, mover_robots)
+        active_packages.append(package.process)  # Track each package's process
         print(f"Simulation {sim_id}: Created package P{i}")
 
-    env.run(until=100)
-    print(f"\n=== Simulation {sim_id} complete ===\n")
+    # Run until all packages complete processing
+    yield env.all_of(active_packages)
+    print(f"\n=== Simulation {sim_id} complete - All {num_packages} packages processed ===\n")
 
 
 if __name__ == "__main__":
     print("Simulation started.")
-    simulate()
+    env = simpy.Environment()
+    env.process(simulate(num_packages=15))  # Change number of packages here
+    env.run()
 

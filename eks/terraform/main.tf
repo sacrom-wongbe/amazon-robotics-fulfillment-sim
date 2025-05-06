@@ -111,14 +111,14 @@ module "eks" {
 
   # EKS Managed Node Group(s)
   eks_managed_node_group_defaults = {
-    instance_types = ["t3.medium"]
+    instance_types = ["t3.small"]
   }
 
   eks_managed_node_groups = {
     "${var.app_name}-ng" = {
       # Starting on 1.30, AL2023 is the default AMI type for EKS managed node groups
       ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = ["t3.medium"]
+      instance_types = ["t3.small"]
 
       min_size     = 1
       max_size     = 10
@@ -143,6 +143,7 @@ module "eks" {
 
   enable_cluster_creator_admin_permissions = true
 
+
   access_entries = {
     terraform_admin = {
       principal_arn = "arn:aws:iam::805791260265:user/terraform"
@@ -158,6 +159,7 @@ module "eks" {
       }
     }
   }
+
 
   create_kms_key = false
   cluster_encryption_config = {
