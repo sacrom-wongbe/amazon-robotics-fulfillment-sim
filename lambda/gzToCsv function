@@ -1,0 +1,111 @@
+import boto3
+import gzip
+import json
+import io
+import csv
+from datetime import datetime
+
+s3 = boto3.client('s3')
+
+def parse_json_line(line):
+    """Parse the first valid JSON object from a line, ignoring extra data."""
+    line = line.strip()
+    if not line:
+        return None
+    try:
+        return json.loads(line)
+    except json.JSONDecodeError as e:
+        if e.msg == "Extra data":
+            try:
+                # Attempt to parse only the first JSON object
+                return json.loads(line[:e.pos])
+            except json.JSONDecodeError:
+                print(f"❌ Could not parse initial part of JSON line: {line[:100]}...")
+                return None
+        else:
+            print(f"❌ JSONDecodeError on line: {line[:100]}... Error: {e}")
+            return None
+    except Exception as e:
+        print(f"❌ Unexpected error parsing line: {line[:100]}... Error: {e}")
+        return None
+
+def lambda_handler(event, context):
+    try:
+        source_bucket = event['detail']['bucket']['name']
+        source_key = event['detail']['object']['key']
+        print(f"🔄 Processing GZIP file: {source_key}")
+
+        # Read and decompress GZIP
+        response = s3.get_object(Bucket=source_bucket, Key=source_key)
+        with gzip.GzipFile(fileobj=io.BytesIO(response['Body'].read())) as gz:
+            content = gz.read().decode('utf-8')
+
+        # Process each line
+        records = []
+        for line in content.splitlines():
+            if not line.strip():  # Skip empty lines
+                continue
+
+            record = parse_json_line(line)
+            if record:
+                records.append(record)
+
+        print(f"📦 Successfully parsed {len(records)} records")
+
+        # Group by data type
+        data_by_type = {
+            'package': [],
+            'robot_telemetry': [],
+            'robot_failure': []
+        }
+
+        for record in records:
+            data_type = record.get('data_type', 'unknown')
+            if data_type in data_by_type:
+                data_by_type[data_type].append(record)
+
+        # Write CSV files
+        destination_bucket = 'robotics-sim-data-805791260265-us-west-2-csved'
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+        # Get date from source path
+        parts = source_key.split('/')
+        year_part = [part for part in parts if part.startswith('year=')][0]
+        month_part = [part for part in parts if part.startswith('month=')][0]
+        day_part = [part for part in parts if part.startswith('day=')][0]
+
+        year = year_part.split('=')[1]
+        month = month_part.split('=')[1]
+        day = day_part.split('=')[1]
+
+        for data_type, type_records in data_by_type.items():
+            if not type_records:
+                continue
+
+            # Convert to CSV
+            output = io.StringIO()
+            writer = csv.DictWriter(output, fieldnames=type_records[0].keys())
+            writer.writeheader()
+            writer.writerows(type_records)
+
+            # Define destination path
+            dest_key = f"csv/year={year}/month={month}/day={day}/{data_type}/{timestamp}_{data_type}.csv"
+
+            # Write to S3
+            s3.put_object(
+                Bucket=destination_bucket,
+                Key=dest_key,
+                Body=output.getvalue().encode('utf-8'),
+                ContentType='text/csv'
+            )
+
+            print(f"✅ Wrote {len(type_records)} {data_type} records to {dest_key}")
+
+        return {
+            'statusCode': 200,
+            'body': f'Successfully processed {len(records)} records'
+        }
+
+    except Exception as e:
+        print(f"❌ Error: {str(e)}")
+        raise

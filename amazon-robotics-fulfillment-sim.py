@@ -9,6 +9,22 @@ from config import AWS_REGION, KINESIS_STREAM_NAME, SIMULATION_ID
 
 
 def send_to_aws(data, data_type="package", max_retries=3):
+    # Create output directory if it doesn't exist
+    output_dir = os.path.join(os.path.dirname(__file__), 'simulation_output')
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Save locally first
+    timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')
+    filename = f"{data_type}_{timestamp}.json"
+    filepath = os.path.join(output_dir, filename)
+    
+    with open(filepath, 'w') as f:
+        json.dump(data, f, indent=2)
+    print(f"📝 Saved {data_type} data locally to: {filepath}")
+
+    # Comment out AWS Kinesis part for local testing
+    """
+    # Continue with AWS sending
     for attempt in range(max_retries):
         try:
             kinesis_client = boto3.client('kinesis', region_name=AWS_REGION)
@@ -33,18 +49,20 @@ def send_to_aws(data, data_type="package", max_retries=3):
                 print(f"❌ Exception while sending {data_type} data to Kinesis:", e)
             else:
                 print(f"⚠️ Retry {attempt + 1}/{max_retries} for {data_type}")
-                time.sleep(1)  # Add a small delay between retries
+                time.sleep(1)
+    """
 
 
 class Robot:
     def __init__(self, env, name, energy_use, failure_rate):
         self.env = env
         self.name = name
-        self.energy_use = energy_use
-        self.failure_rate = failure_rate
+        # Add random variation to energy use (±20%)
+        self.energy_use = energy_use * random.uniform(0.8, 1.2)
+        # Add random variation to failure rate (±30%)
+        self.failure_rate = failure_rate * random.uniform(0.7, 1.3)
         self.tasks_completed = 0
         self.total_energy_used = 0
-        # Use the environment's sim_id instead of generating a new one
         self.sim_id = env.sim_id
         
     def send_telemetry(self, task_type, duration):
@@ -83,7 +101,8 @@ class Robot:
 class StowRobot(Robot):
     def __init__(self, env, name, stow_capacity, energy_use=5, failure_rate=0.01):
         super().__init__(env, name, energy_use, failure_rate)
-        self.stow_capacity = stow_capacity  # Maximum number of items it can stow at once
+        # Add random variation to stow capacity (±2)
+        self.stow_capacity = max(1, stow_capacity + random.randint(-2, 2))
 
     def stow(self, package, station):
         start_time = self.env.now
@@ -102,7 +121,8 @@ class StowRobot(Robot):
 class PickRobot(Robot):
     def __init__(self, env, name, pick_accuracy, energy_use=4, failure_rate=0.02):
         super().__init__(env, name, energy_use, failure_rate)
-        self.pick_accuracy = pick_accuracy  # Accuracy percentage for picking items
+        # Add random variation to pick accuracy (98-100% of specified accuracy)
+        self.pick_accuracy = pick_accuracy * random.uniform(0.98, 1.0)
 
     def pick(self, package, station):
         start_time = self.env.now
@@ -121,7 +141,8 @@ class PickRobot(Robot):
 class PackRobot(Robot):
     def __init__(self, env, name, packing_speed, energy_use=6, failure_rate=0.015):
         super().__init__(env, name, energy_use, failure_rate)
-        self.packing_speed = packing_speed  # Speed of packing items
+        # Add random variation to packing speed (±30%)
+        self.packing_speed = packing_speed * random.uniform(0.7, 1.3)
 
     def pack(self, package, station):
         start_time = self.env.now
@@ -140,7 +161,8 @@ class PackRobot(Robot):
 class ShipRobot(Robot):
     def __init__(self, env, name, shipping_capacity, energy_use=7, failure_rate=0.02):
         super().__init__(env, name, energy_use, failure_rate)
-        self.shipping_capacity = shipping_capacity  # Maximum number of items it can ship at once
+        # Add random variation to shipping capacity (±3)
+        self.shipping_capacity = max(1, shipping_capacity + random.randint(-3, 3))
 
     def ship(self, package, station):
         start_time = self.env.now
@@ -159,7 +181,8 @@ class ShipRobot(Robot):
 class MoverRobot(Robot):
     def __init__(self, env, name, speed, energy_use=3, failure_rate=0.01):
         super().__init__(env, name, energy_use, failure_rate)
-        self.speed = speed  # Speed of movement between stations
+        # Add random variation to speed (±20%)
+        self.speed = speed * random.uniform(0.8, 1.2)
 
     def move_package(self, package, from_station, to_station):
         start_time = self.env.now
@@ -196,21 +219,25 @@ class Package:
         self.process = env.process(self.run())  # Store the process for tracking
 
     def run(self):
+        print(f"\nStarting package {self.package_id} processing")
         for i in range(len(self.stations) - 1):
             current_station = self.stations[i]
             next_station = self.stations[i + 1]
 
+            print(f"Package {self.package_id} at {current_station.name}")
             # Process at the current station
             yield self.env.process(current_station.process(self))
 
+            print(f"Package {self.package_id} moving from {current_station.name} to {next_station.name}")
             # Move to the next station using a mover robot
-            robot = self.mover_robots.pop(0)  # Get an available robot
+            robot = self.mover_robots.pop(0)
             yield self.env.process(robot.move_package(self, current_station, next_station))
-            self.mover_robots.append(robot)  # Return the robot to the pool
+            self.mover_robots.append(robot)
 
         # Process at the final station
+        print(f"Package {self.package_id} at final station {self.stations[-1].name}")
         yield self.env.process(self.stations[-1].process(self))
-        print(f"Package {self.package_id} completed full processing")
+        print(f"✅ Package {self.package_id} completed full processing")
 
 
 class Station:
@@ -251,10 +278,9 @@ class Station:
 
 def simulate(num_packages=10):
     env = simpy.Environment()
-    # Use pod name as simulation identifier instead of random number
     pod_name = os.getenv('HOSTNAME', f'local-{random.randint(1000,9999)}')
     sim_id = f"{SIMULATION_ID}-{pod_name}"
-    env.sim_id = sim_id  # Store sim_id in environment for robots to access
+    env.sim_id = sim_id
     
     print(f"\n=== Starting Simulation {sim_id} with {num_packages} packages ===\n")
     
@@ -265,27 +291,27 @@ def simulate(num_packages=10):
     ship = Station(env, 'Ship', ShipRobot, robot_task='ship', num_robots=5, shipping_capacity=20)
     stations = [stow, pick, pack, ship]
 
-    # Create a pool of mover robots for inter-station movement
+    # Create a pool of mover robots
     mover_robots = [MoverRobot(env, f"MoverRobot{i}", speed=5) for i in range(3)]
 
     print(f"Simulation {sim_id}: Created {len(mover_robots)} mover robots")
     print(f"Simulation {sim_id}: Initializing stations: {', '.join([s.name for s in stations])}")
 
-    # Create packages and track their completion
-    active_packages = []
-    for i in range(1, num_packages + 1):
-        package = Package(env, f'P{i}', stations, mover_robots)
-        active_packages.append(package.process)  # Track each package's process
-        print(f"Simulation {sim_id}: Created package P{i}")
+    # Create packages with delay between each
+    def package_generator():
+        for i in range(1, num_packages + 1):
+            print(f"Starting processing for package P{i}")
+            package = Package(env, f'P{i}', stations, mover_robots)
+            yield env.timeout(2)  # Add delay between package creation
 
-    # Run until all packages complete processing
-    yield env.all_of(active_packages)
-    print(f"\n=== Simulation {sim_id} complete - All {num_packages} packages processed ===\n")
-
+    # Start the package generator process
+    env.process(package_generator())
+    
+    # Run simulation for a fixed duration
+    return env.run(until=500)  # Run for 500 time units
 
 if __name__ == "__main__":
     print("Simulation started.")
     env = simpy.Environment()
-    env.process(simulate(num_packages=15))  # Change number of packages here
-    env.run()
+    simulate()
 

@@ -4,14 +4,15 @@ metadata:
   name: robotics-sim-job
   namespace: robotics-sim
 spec:
-  completions: 3  # Run 3 simulations
-  parallelism: 3  # Run them in parallel
+  completions: 3
+  parallelism: 3  # Reduced to match node count
+  backoffLimit: 4  # Added retry limit
   template:
     metadata:
       labels:
         app: robotics-sim
     spec:
-      restartPolicy: Never  # Don't restart on completion
+      restartPolicy: Never
       serviceAccountName: robotics-sim-sa
       containers:
         - name: robotics-sim
@@ -28,8 +29,8 @@ spec:
                   fieldPath: metadata.name
           resources:
             requests:
-              cpu: "100m"
-              memory: "256Mi"
+              cpu: "250m"     # Increased for t3.small (0.25 core)
+              memory: "512Mi"  # Increased for better performance
             limits:
-              cpu: "500m"
-              memory: "512Mi"
+              cpu: "500m"     # 0.5 core limit
+              memory: "1Gi"    # 1GB memory limit

@@ -103,8 +103,6 @@ module "eks" {
     vpc-cni                = {}
   }
 
-
-
   vpc_id                   = module.vpc.vpc_id
   subnet_ids               = module.vpc.private_subnets
   control_plane_subnet_ids = module.vpc.intra_subnets
@@ -115,14 +113,15 @@ module "eks" {
   }
 
   eks_managed_node_groups = {
-    "${var.app_name}-ng" = {
-      # Starting on 1.30, AL2023 is the default AMI type for EKS managed node groups
+    "${var.app_name}-workers" = {
       ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = ["t3.small"]
-
+      instance_types = ["t3.small"]  # Changed to t3.small for better performance
+      
+      capacity_type  = "ON_DEMAND"
+      
       min_size     = 1
-      max_size     = 10
-      desired_size = 3
+      max_size     = 3
+      desired_size = 2
 
       block_device_mappings = {
         xvda = {
@@ -130,7 +129,7 @@ module "eks" {
           ebs = {
             volume_size = 20
             volume_type = "gp3"
-            iops = 3000
+            iops = 1000        # Reduced to more appropriate value
             throughput = 125
             encrypted = true
             kms_key_id = module.kms.key_arn
@@ -138,27 +137,16 @@ module "eks" {
           }
         }
       }
+
+      labels = {
+        Environment = var.environment
+        NodeType    = "worker"
+      }
     }
   }
 
   enable_cluster_creator_admin_permissions = true
 
-
-  access_entries = {
-    terraform_admin = {
-      principal_arn = "arn:aws:iam::805791260265:user/terraform"
-      username      = "terraform-admin"
-      
-      policy_associations = {
-        admin_access = {
-          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
-          access_scope = {
-            type        = "cluster"
-          }
-        }
-      }
-    }
-  }
 
 
   create_kms_key = false
