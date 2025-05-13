@@ -14,7 +14,3 @@ terraform.rc
 # Provider files
 **/terraform-provider*
 **/terraform.d/plugins/**
-
-# Kubernetes secrets
-k8s/secret.yaml
-secret.yaml

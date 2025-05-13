@@ -5,20 +5,22 @@ metadata:
   namespace: robotics-sim
 spec:
   completions: 3
-  parallelism: 3  # Reduced to match node count
-  backoffLimit: 4  # Added retry limit
+  parallelism: 3  # Keep 3 parallel runs
+  backoffLimit: 2  # Reduced to fail faster
   template:
     metadata:
       labels:
         app: robotics-sim
     spec:
-      restartPolicy: Never
+      restartPolicy: Never  # Changed to Never to preserve failed pod logs
       serviceAccountName: robotics-sim-sa
       containers:
         - name: robotics-sim
           image: 805791260265.dkr.ecr.us-west-2.amazonaws.com/robotics-sim:latest
           imagePullPolicy: Always
           env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
             - name: AWS_REGION
               value: "us-west-2"
             - name: KINESIS_STREAM_NAME
@@ -29,8 +31,27 @@ spec:
                   fieldPath: metadata.name
           resources:
             requests:
-              cpu: "250m"     # Increased for t3.small (0.25 core)
-              memory: "512Mi"  # Increased for better performance
+              cpu: "250m"     # Increased slightly
+              memory: "384Mi"
             limits:
-              cpu: "500m"     # 0.5 core limit
-              memory: "1Gi"    # 1GB memory limit
+              cpu: "500m"     # Increased slightly
+              memory: "768Mi"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              python -u amazon-robotics-fulfillment-sim.py
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import os; exit(0 if os.path.exists('/tmp/sim_ready') else 1)"
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          lifecycle:
+            postStart:
+              exec:
+                command: ["/bin/sh", "-c", "touch /tmp/sim_ready"]
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "rm -f /tmp/sim_ready"]

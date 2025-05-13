@@ -94,10 +94,7 @@ class StowRobot(Robot):
             yield self.env.timeout(2)  # Simulate recovery time
             return
         print(f"{self.name} is stowing {package.package_id} at {station.name}")
-        # Add variable duration based on package weight
-        stow_time = 2 * (1 + (package.weight_kg / 10))  # Heavier packages take longer
-        stow_time *= random.uniform(0.8, 1.2)  # Add ±20% randomness
-        yield self.env.timeout(stow_time)
+        yield self.env.timeout(2)  # Simulate stowing time
         print(f"{self.name} finished stowing {package.package_id} at {station.name}")
         duration = self.env.now - start_time
         self.tasks_completed += 1
@@ -117,11 +114,7 @@ class PickRobot(Robot):
             yield self.env.timeout(2)  # Simulate recovery time
             return
         print(f"{self.name} is picking {package.package_id} at {station.name}")
-        # Variable duration based on accuracy and package volume
-        pick_time = 3 * (1 + (package.volume_liters / 50))  # Larger packages take longer
-        pick_time *= (100 / self.pick_accuracy)  # Less accurate robots take longer
-        pick_time *= random.uniform(0.9, 1.1)  # Add ±10% randomness
-        yield self.env.timeout(pick_time)
+        yield self.env.timeout(3)  # Simulate picking time
         print(f"{self.name} finished picking {package.package_id} at {station.name}")
         duration = self.env.now - start_time
         self.tasks_completed += 1
@@ -141,14 +134,7 @@ class PackRobot(Robot):
             yield self.env.timeout(2)  # Simulate recovery time
             return
         print(f"{self.name} is packing {package.package_id} at {station.name}")
-        # Variable duration based on package size and priority
-        pack_time = 4 * (1 + (package.volume_liters / 30))
-        # Priority affects packing speed
-        priority_multiplier = {'High': 0.8, 'Standard': 1.0, 'Low': 1.2}
-        pack_time *= priority_multiplier[package.priority]
-        pack_time /= self.packing_speed
-        pack_time *= random.uniform(0.85, 1.15)  # Add ±15% randomness
-        yield self.env.timeout(pack_time)
+        yield self.env.timeout(4 / self.packing_speed)  # Simulate packing time based on speed
         print(f"{self.name} finished packing {package.package_id} at {station.name}")
         duration = self.env.now - start_time
         self.tasks_completed += 1
@@ -168,16 +154,7 @@ class ShipRobot(Robot):
             yield self.env.timeout(2)  # Simulate recovery time
             return
         print(f"{self.name} is shipping {package.package_id} at {station.name}")
-        # Variable duration based on destination and priority
-        ship_time = 5
-        # Different zones take different times
-        zone_multiplier = {'A': 0.9, 'B': 1.0, 'C': 1.2}
-        ship_time *= zone_multiplier[package.destination_zone]
-        # Priority affects shipping speed
-        priority_multiplier = {'High': 0.7, 'Standard': 1.0, 'Low': 1.3}
-        ship_time *= priority_multiplier[package.priority]
-        ship_time *= random.uniform(0.9, 1.1)  # Add ±10% randomness
-        yield self.env.timeout(ship_time)
+        yield self.env.timeout(5)  # Simulate shipping time
         print(f"{self.name} finished shipping {package.package_id} at {station.name}")
         duration = self.env.now - start_time
         self.tasks_completed += 1
@@ -193,26 +170,21 @@ class MoverRobot(Robot):
 
     def move_package(self, package, from_station, to_station):
         start_time = self.env.now
-        failed = self.check_failure()
-        if failed:
+        if self.check_failure():
             yield self.env.timeout(2)  # Simulate recovery time
-        
+            return
         print(f"{self.name} is moving {package.package_id} from {from_station.name} to {to_station.name}")
-        travel_time = self.calculate_travel_time(package, from_station, to_station)
-        yield self.env.timeout(travel_time if not failed else 0)
+        travel_time = self.calculate_travel_time(from_station, to_station)
+        yield self.env.timeout(travel_time)
         print(f"{self.name} delivered {package.package_id} to {to_station.name}")
-        
         duration = self.env.now - start_time
         self.tasks_completed += 1
         self.total_energy_used += self.energy_use
         self.send_telemetry("move", duration)
 
-    def calculate_travel_time(self, package, from_station, to_station):
-        # Base travel time is inversely proportional to speed
-        base_time = 10 / self.speed
-        # Add weight impact - each kg adds 5% to travel time
-        weight_factor = 1 + (package.weight_kg * 0.05)
-        return max(1, base_time * weight_factor)
+    def calculate_travel_time(self, from_station, to_station):
+        # Travel time is inversely proportional to speed
+        return max(1, 10 / self.speed)
 
 
 class Package:
@@ -240,15 +212,11 @@ class Package:
             # Process at the current station
             yield self.env.process(current_station.process(self))
 
-            print(f"Package {self.package_id} waiting for mover robot")
-            # Wait for an available mover robot
-            while True:
-                if len(self.mover_robots) > 0:
-                    robot = self.mover_robots.pop(0)  # Get a mover robot
-                    yield self.env.process(robot.move_package(self, current_station, next_station))
-                    self.mover_robots.append(robot)  # Return the robot to the pool
-                    break
-                yield self.env.timeout(1)  # Wait a bit before checking again
+            print(f"Package {self.package_id} moving from {current_station.name} to {next_station.name}")
+            # Move to the next station using a mover robot
+            robot = self.mover_robots.pop(0)
+            yield self.env.process(robot.move_package(self, current_station, next_station))
+            self.mover_robots.append(robot)
 
         # Process at the final station
         print(f"Package {self.package_id} at final station {self.stations[-1].name}")
@@ -300,50 +268,34 @@ def simulate(num_packages=10):
     
     print(f"\n=== Starting Simulation {sim_id} with {num_packages} packages ===\n")
     
-    try:
-        # Define stations with more robots
-        stow = Station(env, 'Stow', StowRobot, robot_task='stow', num_robots=6, stow_capacity=10)
-        pick = Station(env, 'Pick', PickRobot, robot_task='pick', num_robots=6, pick_accuracy=95)
-        pack = Station(env, 'Pack', PackRobot, robot_task='pack', num_robots=6, packing_speed=2)
-        ship = Station(env, 'Ship', ShipRobot, robot_task='ship', num_robots=6, shipping_capacity=20)
-        stations = [stow, pick, pack, ship]
+    # Define stations with their specialized robots and tasks
+    stow = Station(env, 'Stow', StowRobot, robot_task='stow', num_robots=5, stow_capacity=10)
+    pick = Station(env, 'Pick', PickRobot, robot_task='pick', num_robots=5, pick_accuracy=95)
+    pack = Station(env, 'Pack', PackRobot, robot_task='pack', num_robots=5, packing_speed=2)
+    ship = Station(env, 'Ship', ShipRobot, robot_task='ship', num_robots=5, shipping_capacity=20)
+    stations = [stow, pick, pack, ship]
 
-        # Increase mover robot pool
-        mover_robots = [MoverRobot(env, f"MoverRobot{i}", speed=5) for i in range(5)]  # Increased from 3 to 5
+    # Create a pool of mover robots
+    mover_robots = [MoverRobot(env, f"MoverRobot{i}", speed=5) for i in range(3)]
 
-        print(f"Simulation {sim_id}: Created {len(mover_robots)} mover robots")
-        print(f"Simulation {sim_id}: Initializing stations: {', '.join([s.name for s in stations])}")
+    print(f"Simulation {sim_id}: Created {len(mover_robots)} mover robots")
+    print(f"Simulation {sim_id}: Initializing stations: {', '.join([s.name for s in stations])}")
 
-        # Create packages with delay between each
-        def package_generator():
-            for i in range(1, num_packages + 1):
-                print(f"Starting processing for package P{i}")
-                package = Package(env, f'P{i}', stations, mover_robots)
-                yield env.timeout(2)  # Add delay between package creation
+    # Create packages with delay between each
+    def package_generator():
+        for i in range(1, num_packages + 1):
+            print(f"Starting processing for package P{i}")
+            package = Package(env, f'P{i}', stations, mover_robots)
+            yield env.timeout(2)  # Add delay between package creation
 
-        # Start the package generator process
-        env.process(package_generator())
-        
-        # Run simulation until all packages are processed
-        # Calculate required time based on number of packages and operations
-        required_time = num_packages * (
-            2 +  # Package creation delay
-            4 * 5 +  # Station processing times (4 stations × ~5 units each)
-            3 * 10  # Mover operations (3 moves × ~10 units each)
-        )
-        result = env.run(until=500)
-        print(f"✅ Simulation {sim_id} completed successfully")
-        return True
-    except Exception as e:
-        print(f"❌ Simulation {sim_id} failed: {str(e)}")
-        return False
+    # Start the package generator process
+    env.process(package_generator())
+    
+    # Run simulation for a fixed duration
+    return env.run(until=500)  # Run for 500 time units
 
 if __name__ == "__main__":
     print("Simulation started.")
-    success = simulate()
-    if not success:
-        print("Simulation failed, exiting with error code 1")
-        exit(1)
-    print("Simulation completed successfully")
-    exit(0)
+    env = simpy.Environment()
+    simulate()
 

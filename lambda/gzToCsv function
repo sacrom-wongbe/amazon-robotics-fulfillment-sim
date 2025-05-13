@@ -8,26 +8,43 @@ from datetime import datetime
 s3 = boto3.client('s3')
 
 def parse_json_line(line):
-    """Parse the first valid JSON object from a line, ignoring extra data."""
+    """Parse potentially concatenated JSON objects from a line."""
     line = line.strip()
     if not line:
         return None
-    try:
-        return json.loads(line)
-    except json.JSONDecodeError as e:
-        if e.msg == "Extra data":
-            try:
-                # Attempt to parse only the first JSON object
-                return json.loads(line[:e.pos])
-            except json.JSONDecodeError:
-                print(f"❌ Could not parse initial part of JSON line: {line[:100]}...")
-                return None
-        else:
-            print(f"❌ JSONDecodeError on line: {line[:100]}... Error: {e}")
-            return None
-    except Exception as e:
-        print(f"❌ Unexpected error parsing line: {line[:100]}... Error: {e}")
-        return None
+
+    all_records = []
+    pos = 0
+    while pos < len(line):
+        try:
+            # Find opening brace
+            while pos < len(line) and line[pos] != '{':
+                pos += 1
+            if pos >= len(line):
+                break
+
+            # Parse individual JSON object
+            decoder = json.JSONDecoder()
+            record, new_pos = decoder.raw_decode(line[pos:])
+            all_records.append(record)
+            pos += new_pos
+        except json.JSONDecodeError:
+            pos += 1
+        except Exception as e:
+            print(f"❌ Error parsing at position {pos}: {e}")
+            pos += 1
+
+    return all_records[0] if all_records else None
+
+def infer_data_type(record):
+    """Infer the data type based on record fields."""
+    if 'PackageID' in record:
+        return 'package'
+    elif 'RobotName' in record and 'TaskType' in record:
+        return 'robot_telemetry'
+    elif 'RobotName' in record and 'FailureReason' in record:
+        return 'robot_failure'
+    return 'unknown'
 
 def lambda_handler(event, context):
     try:
@@ -40,15 +57,33 @@ def lambda_handler(event, context):
         with gzip.GzipFile(fileobj=io.BytesIO(response['Body'].read())) as gz:
             content = gz.read().decode('utf-8')
 
-        # Process each line
-        records = []
-        for line in content.splitlines():
-            if not line.strip():  # Skip empty lines
-                continue
+        # Add debug logging
+        print(f"📝 Raw content length: {len(content)}")
+        print(f"📝 First few lines: {content[:500]}")
 
-            record = parse_json_line(line)
-            if record:
+        # Process content as one line since Firehose may concatenate records
+        records = []
+        line = content.strip()
+        pos = 0
+        while pos < len(line):
+            try:
+                # Find opening brace
+                while pos < len(line) and line[pos] != '{':
+                    pos += 1
+                if pos >= len(line):
+                    break
+
+                # Parse individual JSON object
+                decoder = json.JSONDecoder()
+                record, new_pos = decoder.raw_decode(line[pos:])
                 records.append(record)
+                print(f"✅ Parsed record {len(records)}: {record.get('PackageID') or record.get('RobotName')}")
+                pos += new_pos
+            except json.JSONDecodeError:
+                pos += 1
+            except Exception as e:
+                print(f"❌ Error parsing at position {pos}: {e}")
+                pos += 1
 
         print(f"📦 Successfully parsed {len(records)} records")
 
@@ -60,9 +95,15 @@ def lambda_handler(event, context):
         }
 
         for record in records:
-            data_type = record.get('data_type', 'unknown')
+            # Infer data_type if not present
+            data_type = record.get('data_type') or infer_data_type(record)
             if data_type in data_by_type:
                 data_by_type[data_type].append(record)
+                print(f"📎 Added record to {data_type}: {record.get('PackageID') or record.get('RobotName')}")
+
+        # Print debug info for each data type
+        for dtype, recs in data_by_type.items():
+            print(f"📊 {dtype}: {len(recs)} records")
 
         # Write CSV files
         destination_bucket = 'robotics-sim-data-805791260265-us-west-2-csved'

@@ -1,4 +1,3 @@
-# Provider
 terraform {
   required_providers {
     aws = {
@@ -13,7 +12,6 @@ provider "aws" {
   region = var.region
 }
 
-# S3 bucket
 resource "aws_s3_bucket" "state" {
   bucket = "${var.aws_account_id}-bucket-state-file"
 
