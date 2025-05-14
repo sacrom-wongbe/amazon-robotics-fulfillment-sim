@@ -37,6 +37,7 @@ module "iam" {
 
   eks_worker_role_name = module.eks.worker_iam_role_name
   kinesis_stream_name = var.kinesis_stream_name
+  firehose_role_name = var.firehose_role_name
   region = var.region
   aws_account_id = data.aws_caller_identity.current.account_id
   tags              = var.tags
@@ -85,10 +86,19 @@ module "firehose" {
   region      = var.region
   environment = var.environment
   app_name    = var.app_name
-
   kinesis_stream_arn = module.kinesis.kinesis_stream_arn
   firehose_s3_bucket = var.firehose_s3_bucket
+  firehose_s3_bucket_arn = module.s3.archive_bucket_arn
   firehose_role_arn  = module.iam.firehose_role_arn
 
+  tags = var.tags
+}
+
+module "s3" {
+  source      = "./modules/s3"
+  app_name    = var.app_name
+  environment = var.environment
+  archive_bucket_name = var.firehose_s3_bucket
+  processed_bucket_name = var.processed_s3_bucket
   tags = var.tags
 }

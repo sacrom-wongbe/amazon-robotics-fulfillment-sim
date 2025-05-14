@@ -18,8 +18,23 @@ variable "aws_account_id" {
   type        = string
 }
 
+variable "firehose_s3_bucket" {
+  type        = string
+  description = "The name of the S3 compressed bucket"
+}
+
 variable "tags" {
-  description = "Tags to apply to the IAM resources"
   type        = map(string)
+  description = "A map of tags to apply to the IAM policy"
   default     = {}
+}
+
+variable "firehose_role_name" {
+  type        = string
+  description = "The name of the IAM role used by Firehose"
+}
+
+variable "firehose_s3_bucket_arn" {
+  type        = string
+  description = "ARN of the S3 bucket where Firehose will store data"
 }

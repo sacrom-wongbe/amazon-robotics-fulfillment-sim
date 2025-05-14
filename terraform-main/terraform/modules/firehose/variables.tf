@@ -28,6 +28,11 @@ variable "firehose_role_arn" {
   type        = string
 }
 
+variable "firehose_s3_bucket_arn" {
+  type        = string
+  description = "ARN of the S3 bucket where Firehose will store data"
+}
+
 variable "tags" {
   description = "A map of tags to add to all resources"
   type        = map(string)

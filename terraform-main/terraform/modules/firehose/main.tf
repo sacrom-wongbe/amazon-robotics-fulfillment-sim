@@ -9,10 +9,11 @@ resource "aws_kinesis_firehose_delivery_stream" "firehose" {
 
   s3_configuration {
     role_arn           = var.firehose_role_arn
-    bucket_arn         = var.firehose_s3_bucket
+    bucket_arn         = var.firehose_s3_bucket_arn
     buffer_size        = 5
     buffer_interval    = 300
     compression_format = "GZIP"
+    prefix             = "simulation-data/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/"
   }
 
   tags = var.tags

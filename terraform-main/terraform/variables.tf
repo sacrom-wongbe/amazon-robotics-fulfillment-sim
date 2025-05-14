@@ -69,3 +69,15 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "processed_s3_bucket" {
+  description = "Name of the processed S3 bucket for CSV data"
+  type        = string
+  default     = "processed-analytics-csv-bucket"
+}
+
+variable "firehose_role_name" {
+  description = "Name of the IAM role used by Firehose"
+  type        = string
+  default     = "firehose-role"
+}
