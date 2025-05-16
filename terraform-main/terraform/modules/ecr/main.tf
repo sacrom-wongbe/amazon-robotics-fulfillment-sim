@@ -2,6 +2,11 @@ resource "aws_ecr_repository" "app" {
   name                 = "${var.app_name}-repository"
   image_tag_mutability = "MUTABLE"
 
+  encryption_configuration {
+    encryption_type = "KMS"
+    kms_key         = var.kms_key_arn
+  }
+
   tags = merge(
     {
       Environment = var.environment

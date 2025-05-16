@@ -34,3 +34,8 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "firehose_log_group_name" {
+  description = "CloudWatch Log Group for Firehose"
+  type        = string
+}

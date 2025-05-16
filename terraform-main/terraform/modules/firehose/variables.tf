@@ -33,6 +33,16 @@ variable "firehose_s3_bucket_arn" {
   description = "ARN of the S3 bucket where Firehose will store data"
 }
 
+variable "firehose_log_group_name" {
+  description = "CloudWatch Log Group for Firehose"
+  type        = string
+}
+
+variable "firehose_log_stream_name" {
+  description = "CloudWatch Log Stream for Firehose"
+  type        = string
+}
+
 variable "tags" {
   description = "A map of tags to add to all resources"
   type        = map(string)

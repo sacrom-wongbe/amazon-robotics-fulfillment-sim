@@ -101,6 +101,29 @@ resource "aws_iam_policy" "firehose_s3_access" {
   tags = var.tags
 }
 
+resource "aws_iam_policy" "firehose_cloudwatch_logs" {
+  name        = "firehose-cloudwatch-logs-policy"
+  description = "Policy for Firehose to write logs to CloudWatch"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:PutLogEvents",
+          "logs:CreateLogStream",
+          "logs:CreateLogGroup",
+          "logs:DescribeLogStreams"
+        ]
+        Resource = [
+          "arn:aws:logs:${var.region}:${var.aws_account_id}:log-group:${var.firehose_log_group_name}:*"
+        ]
+      }
+    ]
+  })
+  tags = var.tags
+}
+
 resource "aws_iam_role_policy_attachment" "firehose_s3_access" {
   role       = aws_iam_role.firehose_role.name
   policy_arn = aws_iam_policy.firehose_s3_access.arn
@@ -109,4 +132,9 @@ resource "aws_iam_role_policy_attachment" "firehose_s3_access" {
 resource "aws_iam_role_policy_attachment" "firehose_kinesis_access" {
   role       = aws_iam_role.firehose_role.name
   policy_arn = aws_iam_policy.kinesis_access.arn
+}
+
+resource "aws_iam_role_policy_attachment" "firehose_cloudwatch_logs" {
+  role       = aws_iam_role.firehose_role.name
+  policy_arn = aws_iam_policy.firehose_cloudwatch_logs.arn
 }

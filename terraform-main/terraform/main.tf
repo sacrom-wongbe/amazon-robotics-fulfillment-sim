@@ -41,6 +41,7 @@ module "iam" {
   firehose_s3_bucket     = module.s3.archive_bucket_name
   firehose_role_name = var.firehose_role_name
   region = var.region
+  firehose_log_group_name = var.firehose_log_group_name
   aws_account_id = data.aws_caller_identity.current.account_id
   tags              = var.tags
 }
@@ -70,6 +71,7 @@ module "kinesis" {
   kinesis_stream_name = var.kinesis_stream_name
   eks_worker_role_name = module.eks.worker_iam_role_name
   kinesis_shard_count = var.kinesis_shard_count
+  kms_key_arn = module.kms.key_arn
   tags = var.tags
   vpc_cidr_block = module.vpc.vpc_cidr_block
 }
@@ -79,7 +81,7 @@ module "ecr" {
   region      = var.region
   environment = var.environment
   app_name    = var.app_name
-
+  kms_key_arn = module.kms.key_arn
   tags = var.tags
 }
 
@@ -92,7 +94,8 @@ module "firehose" {
   firehose_s3_bucket = var.firehose_s3_bucket
   firehose_s3_bucket_arn = module.s3.archive_bucket_arn
   firehose_role_arn  = module.iam.firehose_role_arn
-
+  firehose_log_group_name = var.firehose_log_group_name
+  firehose_log_stream_name = var.firehose_log_stream_name
   tags = var.tags
 }
 

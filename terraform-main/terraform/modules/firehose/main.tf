@@ -14,8 +14,23 @@ resource "aws_kinesis_firehose_delivery_stream" "firehose" {
     buffering_interval = 300
     compression_format = "GZIP"
     prefix             = "simulation-data/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/"
+
+    cloudwatch_logging_options {
+      enabled         = true
+      log_group_name  = var.firehose_log_group_name
+      log_stream_name = var.firehose_log_stream_name
+    }
   }
 
   tags = var.tags
+}
+
+resource "aws_cloudwatch_log_group" "firehose" {
+  name = var.firehose_log_group_name
+}
+
+resource "aws_cloudwatch_log_stream" "firehose" {
+  name           = var.firehose_log_stream_name
+  log_group_name = aws_cloudwatch_log_group.firehose.name
 }
 

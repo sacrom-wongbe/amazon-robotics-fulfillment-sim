@@ -42,6 +42,10 @@ resource "aws_kinesis_stream" "stream" {
   name             = var.kinesis_stream_name
   shard_count      = var.kinesis_shard_count
   retention_period = 24
+  shard_level_metrics = ["ALL"]
+
+  encryption_type  = "KMS"
+  kms_key_id       = var.kms_key_arn
 
   tags = merge(
     {
@@ -50,4 +54,18 @@ resource "aws_kinesis_stream" "stream" {
     },
     var.tags,
   )
+}
+
+resource "aws_cloudwatch_log_group" "kinesis" {
+  name = "/aws/kinesis/${var.kinesis_stream_name}"
+  retention_in_days = 14
+  tags = {
+    Environment = var.environment
+    Terraform   = "true"
+  }
+}
+
+resource "aws_cloudwatch_log_stream" "kinesis" {
+  name           = "${var.kinesis_stream_name}-log-stream"
+  log_group_name = aws_cloudwatch_log_group.kinesis.name
 }

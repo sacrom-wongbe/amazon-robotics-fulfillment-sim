@@ -87,3 +87,15 @@ variable "azs" {
   type        = list(string)
   default     = ["us-west-2a", "us-west-2b", "us-west-2c", "us-west-2d"]
 }
+
+variable "firehose_log_group_name" {
+  description = "CloudWatch Log Group for Firehose"
+  type        = string
+  default     = "firehose-log-group"
+}
+
+variable "firehose_log_stream_name" {
+  description = "CloudWatch Log Stream for Firehose"
+  type        = string
+  default     = "firehose-log-stream"
+}
