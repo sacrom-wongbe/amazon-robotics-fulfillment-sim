@@ -22,6 +22,7 @@ module "vpc" {
   source      = "./modules/vpc"
   region      = var.region
   environment = var.environment
+  azs         = var.azs
 }
 
 module "kms" {
@@ -37,6 +38,7 @@ module "iam" {
 
   eks_worker_role_name = module.eks.worker_iam_role_name
   kinesis_stream_name = var.kinesis_stream_name
+  firehose_s3_bucket     = module.s3.archive_bucket_name
   firehose_role_name = var.firehose_role_name
   region = var.region
   aws_account_id = data.aws_caller_identity.current.account_id
@@ -100,5 +102,4 @@ module "s3" {
   environment = var.environment
   archive_bucket_name = var.firehose_s3_bucket
   processed_bucket_name = var.processed_s3_bucket
-  tags = var.tags
 }

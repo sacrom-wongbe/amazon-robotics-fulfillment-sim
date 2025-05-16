@@ -51,8 +51,3 @@ resource "aws_kinesis_stream" "stream" {
     var.tags,
   )
 }
-
-resource "aws_iam_role_policy_attachment" "eks_kinesis_access" {
-  role       = var.eks_worker_role_name
-  policy_arn = aws_iam_policy.kinesis_access.arn
-}

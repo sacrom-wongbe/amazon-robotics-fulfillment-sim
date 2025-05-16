@@ -13,7 +13,7 @@ output "security_group_id" {
   value       = aws_security_group.kinesis_endpoint.id
 }
 
-output "kinesis_policy_arn" {
-  description = "ARN of the Kinesis access IAM policy"
-  value       = aws_iam_policy.kinesis_access.arn
+output "kinesis_stream_arn" {
+  description = "ARN of the Kinesis stream"
+  value       = aws_kinesis_stream.stream.arn
 }

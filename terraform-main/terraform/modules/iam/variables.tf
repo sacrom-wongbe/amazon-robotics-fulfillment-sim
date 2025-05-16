@@ -1,8 +1,3 @@
-variable "eks_worker_role_name" {
-  description = "Name of the IAM role used by EKS worker nodes"
-  type        = string
-}
-
 variable "kinesis_stream_name" {
   description = "Name of the Kinesis stream"
   type        = string
@@ -19,22 +14,23 @@ variable "aws_account_id" {
 }
 
 variable "firehose_s3_bucket" {
+  description = "Name of the Firehose bucket"
   type        = string
-  description = "The name of the S3 compressed bucket"
-}
-
-variable "tags" {
-  type        = map(string)
-  description = "A map of tags to apply to the IAM policy"
-  default     = {}
 }
 
 variable "firehose_role_name" {
+  description = "Name of the IAM role used by Firehose"
   type        = string
-  description = "The name of the IAM role used by Firehose"
+  default     = "firehose-role"
 }
 
-variable "firehose_s3_bucket_arn" {
+variable "eks_worker_role_name" {
+  description = "Name of the EKS worker node"
   type        = string
-  description = "ARN of the S3 bucket where Firehose will store data"
+}
+
+variable "tags" {
+  description = "Tags to apply to the IAM resources"
+  type        = map(string)
+  default     = {}
 }

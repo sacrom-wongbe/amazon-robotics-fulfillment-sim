@@ -86,7 +86,7 @@ resource "aws_iam_policy" "firehose_s3_access" {
           "s3:ListBucket",
           "s3:GetObject"
         ],
-        Resource = "arn:aws:s3:::${var.s3_bucket_name}",
+        Resource = "arn:aws:s3:::${var.firehose_s3_bucket}",
         Condition = {
           StringEquals = {
             "s3:prefix": [
