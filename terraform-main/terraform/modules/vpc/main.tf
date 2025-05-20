@@ -27,3 +27,15 @@ module "vpc" {
     Environment = var.environment
   }
 }
+
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = var.vpc_id
+  service_name      = "com.amazonaws.${var.region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = module.vpc.private_route_table_ids
+
+  tags = {
+    Name        = "s3-vpc-endpoint"
+    Environment = var.environment
+  }
+}

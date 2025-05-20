@@ -1,3 +1,8 @@
+variable "kms_key_arn" {
+  description = "KMS key ARN for S3 bucket encryption"
+  type        = string
+}
+
 output "archive_bucket_arn" {
   value       = aws_s3_bucket.archive.arn
   description = "ARN of the archive S3 bucket"

@@ -105,4 +105,5 @@ module "s3" {
   environment = var.environment
   archive_bucket_name = var.firehose_s3_bucket
   processed_bucket_name = var.processed_s3_bucket
+  kms_key_arn = module.kms.key_arn
 }
