@@ -39,6 +39,7 @@ module "iam" {
   eks_worker_role_name = module.eks.worker_iam_role_name
   kinesis_stream_name = var.kinesis_stream_name
   firehose_s3_bucket     = module.s3.archive_bucket_name
+  lambda_s3_bucket     = module.s3.processed_bucket_name
   firehose_role_name = var.firehose_role_name
   region = var.region
   firehose_log_group_name = var.firehose_log_group_name
@@ -100,10 +101,29 @@ module "firehose" {
 }
 
 module "s3" {
-  source      = "./modules/s3"
-  app_name    = var.app_name
-  environment = var.environment
+  source = "./modules/s3"
+  region      = var.region
+  app_name            = var.app_name
+  environment         = var.environment
   archive_bucket_name = var.firehose_s3_bucket
   processed_bucket_name = var.processed_s3_bucket
+  vpc_id              = module.vpc.vpc_id
   kms_key_arn = module.kms.key_arn
+  route_table_ids     = module.vpc.private_route_table_ids  # Use the correct output
+}
+
+module "lambda" {
+  source = "./modules/lambda"
+  runtime               = var.lambda_runtime
+  lambda_role_arn = module.iam.lambda_role_arn
+  gz_to_csv_handler               = var.gz_to_csv_handler  # Updated handler
+  gz_to_csv_source_code_path      = var.gz_to_csv_source_code_path
+  gz_to_csv_environment_variables = {
+    ENVIRONMENT = var.environment
+    S3_BUCKET   = module.s3.processed_bucket_name
+  }
+  gz_to_csv_timeout               = var.gz_to_csv__timeout
+  gz_to_csv_memory_size           = var.gz_to_csv__memory_size
+  region                = var.region
+  tags                  = var.tags
 }

@@ -39,3 +39,8 @@ variable "firehose_log_group_name" {
   description = "CloudWatch Log Group for Firehose"
   type        = string
 }
+
+variable "lambda_s3_bucket" {
+  description = "Name of the S3 bucket Lambda can write to"
+  type        = string
+}

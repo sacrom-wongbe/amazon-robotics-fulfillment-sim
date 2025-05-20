@@ -99,3 +99,33 @@ variable "firehose_log_stream_name" {
   type        = string
   default     = "firehose-log-stream"
 }
+
+variable "lambda_runtime" {
+  type = string
+  default = "python3.9"
+  description = "Runtime for the Lambda function"
+}
+
+variable "gz_to_csv_source_code_path" {
+  type        = string
+  default     = "C:/Users/bened/amazon-robotics-fulfillment-sim/terraform-main/terraform/modules/lambda/functions/gzToCSV_lambda_function.zip"
+  description = "Path to the zipped Lambda function code"
+}
+
+variable "gz_to_csv__timeout" {
+  type = number
+  default = 30
+  description = "Timeout for the Lambda function"
+}
+
+variable "gz_to_csv__memory_size" {
+  type = number
+  default = 256
+  description = "Memory size for the Lambda function"
+}
+
+variable "gz_to_csv_handler" {
+  description = "Handler for the gzToCSV Lambda function"
+  type        = string
+  default     = "gzToCSV_lambda_function.lambda_handler"
+}

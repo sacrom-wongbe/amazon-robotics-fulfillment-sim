@@ -14,6 +14,9 @@ module "vpc" {
   single_nat_gateway = false
   one_nat_gateway_per_az = false
 
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+
   private_subnet_tags = {
     "kubernetes.io/role/internal-elb" = 1
   }
@@ -24,18 +27,6 @@ module "vpc" {
 
   tags = {
     Terraform   = "true"
-    Environment = var.environment
-  }
-}
-
-resource "aws_vpc_endpoint" "s3" {
-  vpc_id            = var.vpc_id
-  service_name      = "com.amazonaws.${var.region}.s3"
-  vpc_endpoint_type = "Gateway"
-  route_table_ids   = module.vpc.private_route_table_ids
-
-  tags = {
-    Name        = "s3-vpc-endpoint"
     Environment = var.environment
   }
 }
