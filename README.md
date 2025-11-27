@@ -1,64 +1,154 @@
-# Amazon Robotics Fulfillment Simulator
+# **Amazon Robotics Fulfillment Simulator**
 
-## Docker Commands
+A scalable simulation framework that models multi-robot warehouse fulfillment workflows—built to generate high-volume operational data for analytics, forecasting, and ML experimentation.
 
-Build and push the simulator image:
-```powershell
-# Build Docker image
-docker build -t robotics-sim .
+## **Overview**
 
-# Tag image for ECR
-docker tag robotics-sim 805791260265.dkr.ecr.us-west-2.amazonaws.com/robotics-sim:latest
+This project simulates a coordinated fleet of warehouse robots transporting packages across a fulfillment center. It combines **discrete-event simulation**, **containerized execution**, and **AWS cloud-native data infrastructure** to generate large, realistic datasets for downstream analysis.
 
-# Login to ECR
-aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 805791260265.dkr.ecr.us-west-2.amazonaws.com
+The system runs as:
 
-# Push to ECR
-docker push 805791260265.dkr.ecr.us-west-2.amazonaws.com/robotics-sim:latest
+* A **Python + SimPy robotic fulfillment simulator**
+* Containerized in **Docker**
+* Scaled via **Terraform-provisioned Amazon EKS**
+* Streaming results through **Kinesis → Firehose → S3** for persistent analytics
+
+This work was presented at the **University of Washington’s CSEED Fellowship**, where it received an **Award for Technical Growth** for engineering depth and applied cloud architecture.
+
+---
+
+## **✨ Key Features**
+
+### 🚧 **High-Fidelity Robotic Simulation**
+
+* Simulates **multiple robots** navigating fulfillment tasks.
+* Configurable environment:
+
+  * Duration
+  * Number of robots
+  * Number of packages
+  * Routing and task queues
+* Reproducible SimPy event-driven architecture.
+
+### 🐳 **Containerized and Cloud-Ready**
+
+* Fully dockerized simulation engine.
+* Terraform modules provision:
+
+  * Amazon EKS cluster
+  * Node groups
+  * IAM roles for service access
+  * Kinesis streams + Firehose pipeline
+  * S3 analytics bucket
+
+### ⚡ **Distributed Parallel Simulation**
+
+* Launch **dozens to hundreds** of concurrent simulation pods.
+* Parallel runs multiply data-generation throughput—ideal for:
+
+  * ML training datasets
+  * Agent-based modeling
+  * Stress-testing robotics workflows
+  * Throughput and latency studies
+
+### 📡 **Real-Time Data Pipeline**
+
+* Simulation events streamed via **Amazon Kinesis**.
+* Data automatically **buffered, compressed, and delivered** by Firehose.
+* Stored in Amazon S3 in analytics-friendly layouts.
+
+---
+
+## **📁 Project Structure**
+
+```
+.
+├── simulator/
+│   ├── robots.py          # Robot behavior + routing logic
+│   ├── env.py             # SimPy environment orchestration
+│   ├── run.py             # Entrypoint for single simulation execution
+│   └── config.yaml        # Adjustable sim parameters
+│
+├── infra/
+│   ├── main.tf            # EKS, Kinesis, Firehose, IAM
+│   ├── variables.tf       
+│   ├── eks/               # Modularized Kubernetes cluster creation
+│   └── kinesis/           
+│
+├── docker/
+│   └── Dockerfile         # Container for the simulator
+│
+└── k8s/
+    ├── job.yaml           # Defines parallel simulation jobs
+    └── configmap.yaml
 ```
 
-## Kubernetes Commands
+---
 
-Job management:
-```powershell
-# Apply the job
+## **🧠 Why I Built This**
+
+Modern fulfillment centers rely on high-throughput robotics systems. But obtaining **large, labeled, repeatable** datasets for modeling those systems is hard.
+
+This project solves that by:
+
+* Creating a **controllable digital twin** for experimentation
+* Scaling simulation runs across cloud infrastructure
+* Capturing data that mirrors real operational semantics
+
+It’s meant to support:
+
+* ML feature engineering
+* Time-series forecasting
+* Optimization research
+* Human-robot workflow analysis
+* Stress testing and benchmarking
+
+---
+
+## **🚀 Getting Started**
+
+### **1. Deploy Cloud Infrastructure**
+
+```bash
+terraform init
+terraform apply
+```
+
+### **2. Launch Parallel Sims**
+
+```bash
 kubectl apply -f k8s/job.yaml
-
-# Delete existing job
-kubectl delete job robotics-sim-job -n robotics-sim
-
-# Watch pods
-kubectl get pods -n robotics-sim -w
 ```
 
-Pod monitoring:
-```powershell
-# Get all pods with status
-kubectl get pods -n robotics-sim
+---
 
-# Get pod logs (replace POD_NAME with actual pod name)
-kubectl logs -n robotics-sim POD_NAME
+## **📊 Example Output**
 
-# Get logs from all pods with app label
-kubectl logs -n robotics-sim -l app=robotics-sim
+Simulations generate event logs such as:
 
-# Describe pod details
-kubectl describe pod -n robotics-sim POD_NAME
-```
+* Robot pickup & drop events
+* Travel times & distances
+* Queue wait times
+* Collision-avoidance delays
+* Package throughput per time unit
 
-Common flags:
-- `-n`: Specify namespace
-- `-l`: Filter by label
-- `-w`: Watch for changes
-- `-f`: Follow logs in real-time
-- `--previous`: Get logs from previous pod instance
+Delivered to S3 in compressed Firehose parquet batches.
 
-## AWS Commands
+---
 
-```powershell
-# List S3 CSV files
-aws s3 ls s3://robotics-sim-data-805791260265-us-west-2-csved/csv/year=2025/month=05/day=10/ --recursive
+## **🏆 Recognition**
 
-# Get Kinesis stream records
-aws kinesis get-records --shard-iterator $(aws kinesis get-shard-iterator --stream-name robotics-sim-stream --shard-id 0 --shard-iterator-type TRIM_HORIZON --query 'ShardIterator' --output text)
-```
+This project was presented at the **UW CSEED Fellowship**, a selective engineering fellowship.
+It received an **Award for Technical Growth** for demonstrating strong architectural design, AWS proficiency, and simulation engineering.
+
+---
+
+## **🛠️ Tech Stack**
+
+**Simulation:** Python, SimPy
+**Infrastructure:** Terraform, AWS EKS, IAM, VPC
+**Data Pipeline:** Kinesis Streams, Firehose, Amazon S3
+**Containerization:** Docker
+**Orchestration:** Kubernetes Jobs
+
+---
